@@ -22,6 +22,7 @@ class _TodoListViewState extends State<TodoListView>
   String _searchQuery = '';
   String _sortBy = 'created';
   bool _showCompleted = true;
+  bool _isRedirectingToLogin = false;
 
   static const Color zinc950 = Color(0xFF09090b);
   static const Color zinc900 = Color(0xFF18181b);
@@ -59,94 +60,261 @@ class _TodoListViewState extends State<TodoListView>
     });
   }
 
+  String _formatAddedTimestamp(DateTime dateTime) {
+    final localizations = MaterialLocalizations.of(context);
+    final timeText = localizations.formatTimeOfDay(
+      TimeOfDay.fromDateTime(dateTime),
+      alwaysUse24HourFormat: MediaQuery.of(context).alwaysUse24HourFormat,
+    );
+
+    final now = DateTime.now();
+    final isToday =
+        dateTime.year == now.year &&
+        dateTime.month == now.month &&
+        dateTime.day == now.day;
+
+    if (isToday) {
+      return 'Today at $timeText';
+    }
+
+    final dd = dateTime.day.toString().padLeft(2, '0');
+    final mm = dateTime.month.toString().padLeft(2, '0');
+    final yyyy = dateTime.year.toString();
+    return '$dd/$mm/$yyyy at $timeText';
+  }
+
+  void _scheduleLoginRedirect() {
+    if (_isRedirectingToLogin || !mounted) return;
+    _isRedirectingToLogin = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    });
+  }
+
   Future<void> _toggleBiometricLogin(
     bool enabled,
     AuthViewModel authViewModel,
   ) async {
     await authViewModel.setBiometricLoginEnabled(enabled);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          enabled ? 'Biometric login enabled' : 'Biometric login disabled',
-        ),
-        backgroundColor: enabled ? emerald500 : Colors.orangeAccent,
-      ),
+    _showStyledMessage(
+      title: enabled ? 'Biometric enabled' : 'Biometric disabled',
+      message: enabled
+          ? 'Quick login with fingerprint is now active.'
+          : 'Biometric login has been turned off.',
+      icon: enabled ? Icons.fingerprint_rounded : Icons.fingerprint_outlined,
+      accent: enabled ? emerald500 : Colors.orangeAccent,
     );
   }
 
-  Future<void> _handleLogout(AuthViewModel authViewModel) async {
-    final shouldLogout =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: zinc900,
-            title: const Text('Logout', style: TextStyle(color: zinc100)),
-            content: const Text(
-              'Are you sure you want to logout?',
-              style: TextStyle(color: zinc400),
+  void _showStyledMessage({
+    required String title,
+    required String message,
+    required IconData icon,
+    required Color accent,
+  }) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          duration: const Duration(seconds: 3),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: _outlinedPanel(radius: 14, color: zinc900),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accent.withValues(alpha: 0.45)),
+                  ),
+                  child: Icon(icon, color: accent, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.inter(
+                          color: zinc100,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        message,
+                        style: const TextStyle(color: zinc400, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel', style: TextStyle(color: zinc400)),
+          ),
+        ),
+      );
+  }
+
+  Future<bool> _showStyledConfirmDialog({
+    required String title,
+    required String message,
+    required String confirmText,
+    required IconData icon,
+    required Color iconColor,
+    bool destructive = false,
+    Color destructiveColor = Colors.red,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+              decoration: _outlinedPanel(radius: 18, color: zinc900),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: iconColor.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: iconColor.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Icon(icon, color: iconColor, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: GoogleFonts.inter(
+                                color: zinc100,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              message,
+                              style: const TextStyle(
+                                color: zinc400,
+                                fontSize: 13,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: zinc400,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: destructive
+                              ? destructiveColor.withValues(alpha: 0.16)
+                              : zinc100,
+                          foregroundColor: destructive
+                              ? destructiveColor
+                              : zinc950,
+                          elevation: 0,
+                          side: destructive
+                              ? BorderSide(
+                                  color: destructiveColor.withValues(
+                                    alpha: 0.45,
+                                  ),
+                                )
+                              : const BorderSide(color: Colors.transparent),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(confirmText),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Logout', style: TextStyle(color: zinc100)),
-              ),
-            ],
+            ),
           ),
         ) ??
         false;
+  }
+
+  Future<void> _handleLogout(AuthViewModel authViewModel) async {
+    final shouldLogout = await _showStyledConfirmDialog(
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      confirmText: 'Logout',
+      icon: Icons.logout_rounded,
+      iconColor: zinc100,
+    );
 
     if (!shouldLogout) return;
 
     authViewModel.logout();
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed('/login');
+    _scheduleLoginRedirect();
   }
 
   Future<void> _handleDeleteAccount(
     AuthViewModel authViewModel,
     TodoViewModel todoViewModel,
   ) async {
-    final shouldDelete =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: zinc900,
-            title: const Text(
-              'Delete Account',
-              style: TextStyle(color: zinc100),
-            ),
-            content: const Text(
-              'This will remove your account data and all tasks. Continue?',
-              style: TextStyle(color: zinc400),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel', style: TextStyle(color: zinc400)),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final shouldDelete = await _showStyledConfirmDialog(
+      title: 'Delete Account',
+      message: 'This will remove your account data and all tasks. Continue?',
+      confirmText: 'Delete',
+      icon: Icons.delete_forever,
+      iconColor: Colors.red,
+      destructive: true,
+    );
 
     if (!shouldDelete) return;
 
     await todoViewModel.deleteAllTodos();
     await authViewModel.deleteAccount();
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed('/login');
+    _scheduleLoginRedirect();
   }
 
   void _showAccountActionsSheet(
@@ -248,6 +416,10 @@ class _TodoListViewState extends State<TodoListView>
     final todoViewModel = Provider.of<TodoViewModel>(context);
     final authViewModel = Provider.of<AuthViewModel>(context);
 
+    if (!authViewModel.isLoggedIn) {
+      _scheduleLoginRedirect();
+    }
+
     List<TodoModel> filteredTodos = todoViewModel.todos.where((todo) {
       final matchesSearch = todo.title.toLowerCase().contains(_searchQuery);
       final matchesCompletion = _showCompleted || !todo.isCompleted;
@@ -300,46 +472,32 @@ class _TodoListViewState extends State<TodoListView>
               child: IconButton(
                 icon: const Icon(Icons.clear_all, color: Colors.orangeAccent),
                 tooltip: 'Clear completed',
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: zinc900,
-                      title: const Text(
-                        'Clear Completed Tasks',
-                        style: TextStyle(color: zinc100),
-                      ),
-                      content: const Text(
-                        'Remove all completed tasks?',
-                        style: TextStyle(color: zinc400),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(color: zinc400),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            final completedTasks = todoViewModel.todos
-                                .where((t) => t.isCompleted)
-                                .toList();
-                            for (final task in completedTasks) {
-                              await todoViewModel.deleteTodo(task.id!);
-                            }
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          },
-                          child: const Text(
-                            'Clear',
-                            style: TextStyle(color: Colors.orangeAccent),
-                          ),
-                        ),
-                      ],
-                    ),
+                onPressed: () async {
+                  final shouldClear = await _showStyledConfirmDialog(
+                    title: 'Clear Completed Tasks',
+                    message: 'Remove all completed tasks?',
+                    confirmText: 'Clear',
+                    icon: Icons.clear_all_rounded,
+                    iconColor: Colors.orangeAccent,
+                    destructive: true,
+                    destructiveColor: Colors.orangeAccent,
+                  );
+
+                  if (!shouldClear) return;
+
+                  final completedTasks = todoViewModel.todos
+                      .where((t) => t.isCompleted)
+                      .toList();
+                  for (final task in completedTasks) {
+                    await todoViewModel.deleteTodo(task.id!);
+                  }
+
+                  if (!mounted) return;
+                  _showStyledMessage(
+                    title: 'Completed tasks cleared',
+                    message: 'All completed tasks were removed.',
+                    icon: Icons.done_all_rounded,
+                    accent: Colors.orangeAccent,
                   );
                 },
               ),
@@ -650,43 +808,14 @@ class _TodoListViewState extends State<TodoListView>
                                   }
 
                                   final shouldDelete =
-                                      await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text(
-                                            'Delete Task?',
-                                            style: TextStyle(color: zinc100),
-                                          ),
-                                          backgroundColor: zinc900,
-                                          content: const Text(
-                                            'This action cannot be undone',
-                                            style: TextStyle(color: zinc400),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context, false),
-                                              child: const Text(
-                                                'Cancel',
-                                                style: TextStyle(
-                                                  color: zinc400,
-                                                ),
-                                              ),
-                                            ),
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context, true),
-                                              child: const Text(
-                                                'Delete',
-                                                style: TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ) ??
-                                      false;
+                                      await _showStyledConfirmDialog(
+                                        title: 'Delete Task?',
+                                        message: 'This action cannot be undone',
+                                        confirmText: 'Delete',
+                                        icon: Icons.delete_outline_rounded,
+                                        iconColor: Colors.red,
+                                        destructive: true,
+                                      );
 
                                   if (shouldDelete) {
                                     await todoViewModel.deleteTodo(todo.id!);
@@ -737,12 +866,31 @@ class _TodoListViewState extends State<TodoListView>
                                                 : null,
                                           ),
                                     ),
-                                    subtitle: Text(
-                                      'Tap to view secret note • Swipe to complete/delete',
-                                      style: TextStyle(
-                                        color: zinc400.withValues(alpha: 0.95),
-                                        fontSize: 12,
-                                      ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Added ${_formatAddedTimestamp(todo.createdAt)}',
+                                          style: TextStyle(
+                                            color: emerald500.withValues(
+                                              alpha: 0.85,
+                                            ),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Tap to view secret note • Swipe to complete/delete',
+                                          style: TextStyle(
+                                            color: zinc400.withValues(
+                                              alpha: 0.95,
+                                            ),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -780,49 +928,20 @@ class _TodoListViewState extends State<TodoListView>
                                       todo,
                                       todoViewModel,
                                     ),
-                                    onLongPress: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text(
-                                            'Delete Task?',
-                                            style: TextStyle(color: zinc100),
-                                          ),
-                                          backgroundColor: zinc900,
-                                          content: const Text(
-                                            'This action cannot be undone',
-                                            style: TextStyle(color: zinc400),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context),
-                                              child: const Text(
-                                                'Cancel',
-                                                style: TextStyle(
-                                                  color: zinc400,
-                                                ),
-                                              ),
-                                            ),
-                                            TextButton(
-                                              onPressed: () async {
-                                                await todoViewModel.deleteTodo(
-                                                  todo.id!,
-                                                );
-                                                if (context.mounted) {
-                                                  Navigator.pop(context);
-                                                }
-                                              },
-                                              child: const Text(
-                                                'Delete',
-                                                style: TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
+                                    onLongPress: () async {
+                                      final shouldDelete =
+                                          await _showStyledConfirmDialog(
+                                            title: 'Delete Task?',
+                                            message:
+                                                'This action cannot be undone',
+                                            confirmText: 'Delete',
+                                            icon: Icons.delete_outline_rounded,
+                                            iconColor: Colors.red,
+                                            destructive: true,
+                                          );
+
+                                      if (!shouldDelete) return;
+                                      await todoViewModel.deleteTodo(todo.id!);
                                     },
                                   ),
                                 ),
@@ -856,45 +975,89 @@ class _TodoListViewState extends State<TodoListView>
     final decryptedNote = vm.decryptSecretNote(todo.encryptedSecretNotes);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: zinc900,
-        title: Text(
-          'Secret Note: ${todo.title}',
-          style: const TextStyle(color: zinc100),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'DECRYPTED DATA:',
-              style: const TextStyle(fontSize: 10, color: zinc400),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: zinc950,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: zinc800),
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+          decoration: _outlinedPanel(radius: 18, color: zinc900),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: emerald500.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: emerald500.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.lock_outline_rounded,
+                      color: emerald500,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Secret Note: ${todo.title}',
+                      style: GoogleFonts.inter(
+                        color: zinc100,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Text(
-                decryptedNote.isEmpty ? 'No secret note' : decryptedNote,
+              const SizedBox(height: 12),
+              const Text(
+                'DECRYPTED DATA',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: decryptedNote.isEmpty ? zinc400 : zinc100,
+                  fontSize: 10,
+                  color: zinc400,
+                  letterSpacing: 1.1,
                 ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: zinc100)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: zinc950,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: zinc800),
+                ),
+                child: Text(
+                  decryptedNote.isEmpty ? 'No secret note' : decryptedNote,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: decryptedNote.isEmpty ? zinc400 : zinc100,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: TextButton.styleFrom(foregroundColor: zinc100),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

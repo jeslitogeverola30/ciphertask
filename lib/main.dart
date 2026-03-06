@@ -57,6 +57,10 @@ class MyApp extends StatelessWidget {
         return Listener(
           behavior: HitTestBehavior.translucent,
           onPointerDown: (_) => authViewModel.handleUserInteraction(),
+          onPointerMove: (_) => authViewModel.handleUserInteraction(),
+          onPointerUp: (_) => authViewModel.handleUserInteraction(),
+          onPointerHover: (_) => authViewModel.handleUserInteraction(),
+          onPointerSignal: (_) => authViewModel.handleUserInteraction(),
           child: MaterialApp(
             title: 'CipherTask',
             theme: ThemeData(

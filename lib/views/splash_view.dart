@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +22,8 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
   static const Color zinc100 = Color(0xFFf4f4f5);
   static const Color zinc400 = Color(0xFFa1a1aa);
   static const Color zinc800 = Color(0xFF27272a);
+  static const Color cyberRed = Color(0xFFff2b55);
+  static const Color cyberRedSoft = Color(0xFFff5e7a);
 
   @override
   void initState() {
@@ -62,7 +65,23 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
       backgroundColor: zinc950,
       body: Stack(
         children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
+          Positioned.fill(
+            child: CustomPaint(painter: _CyberpunkBackgroundPainter()),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.18),
+                    Colors.black.withValues(alpha: 0.35),
+                  ],
+                ),
+              ),
+            ),
+          ),
           Center(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -74,9 +93,11 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: zinc950,
+                        color: const Color(0xFF14070c),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: zinc800),
+                        border: Border.all(
+                          color: cyberRed.withValues(alpha: 0.4),
+                        ),
                       ),
                       child: const Icon(
                         Icons.terminal_rounded,
@@ -121,7 +142,7 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                       width: 120,
                       child: LinearProgressIndicator(
                         backgroundColor: zinc800,
-                        color: zinc100,
+                        color: cyberRedSoft,
                         minHeight: 2,
                       ),
                     ),
@@ -130,7 +151,7 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                       'V 1.0.0',
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 10,
-                        color: zinc800,
+                        color: cyberRed.withValues(alpha: 0.55),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -145,22 +166,104 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
   }
 }
 
-class _GridPainter extends CustomPainter {
+class _CyberpunkBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFf4f4f5).withOpacity(0.03)
-      ..strokeWidth = 1.0;
+    final rect = Offset.zero & size;
 
-    const spacing = 40.0;
-    for (double i = 0; i < size.width; i += spacing) {
-      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
+    final basePaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF09090b), Color(0xFF12040A), Color(0xFF0A0508)],
+        stops: [0, 0.52, 1],
+      ).createShader(rect);
+    canvas.drawRect(rect, basePaint);
+
+    final redGlow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.35, -0.5),
+        radius: 1.2,
+        colors: [
+          const Color(0xFFff2b55).withValues(alpha: 0.28),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, redGlow);
+
+    final sideGlow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.95, 0.8),
+        radius: 0.9,
+        colors: [
+          const Color(0xFFff5e7a).withValues(alpha: 0.14),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, sideGlow);
+
+    final horizonY = size.height * 0.58;
+    final gridPaint = Paint()
+      ..color = const Color(0xFFff2b55).withValues(alpha: 0.13)
+      ..strokeWidth = 1;
+
+    for (int i = 0; i <= 16; i++) {
+      final t = i / 16;
+      final depth = math.pow(t, 1.65).toDouble();
+      final y = horizonY + (size.height - horizonY) * depth;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
-    for (double i = 0; i < size.height; i += spacing) {
-      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+
+    final vanishingPoint = Offset(size.width * 0.5, horizonY);
+    for (int i = 0; i <= 18; i++) {
+      final x = size.width * i / 18;
+      canvas.drawLine(Offset(x, size.height), vanishingPoint, gridPaint);
+    }
+
+    final signalPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..color = const Color(0xFFff5e7a).withValues(alpha: 0.3);
+
+    for (int line = 0; line < 4; line++) {
+      final path = Path();
+      final baseY = size.height * (0.16 + (line * 0.09));
+
+      for (double x = 0; x <= size.width; x += 6) {
+        final normalizedX = x / size.width;
+        final waveA = math.sin(
+          (normalizedX * math.pi * 2 * (2.2 + (line * 0.32))) + (line * 0.7),
+        );
+        final waveB = math.cos((normalizedX * math.pi * 2 * 5.2) - line);
+        final y = baseY + (waveA * (8 + line * 2)) + (waveB * 2.6);
+
+        if (x == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+
+      canvas.drawPath(path, signalPaint);
+    }
+
+    final scanlinePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.02)
+      ..strokeWidth = 1;
+    for (double y = 0; y < size.height; y += 3) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), scanlinePaint);
+    }
+
+    final nodePaint = Paint()
+      ..color = const Color(0xFFff8aa0).withValues(alpha: 0.32);
+    for (int i = 0; i < 70; i++) {
+      final dx = ((i * 97) % 1000) / 1000 * size.width;
+      final dy = ((i * 57) % 1000) / 1000 * size.height;
+      final radius = 0.6 + (((i * 13) % 10) / 20);
+      canvas.drawCircle(Offset(dx, dy), radius, nodePaint);
     }
   }
 
   @override
-  bool shouldRepaint(_GridPainter oldDelegate) => false;
+  bool shouldRepaint(_CyberpunkBackgroundPainter oldDelegate) => false;
 }

@@ -39,12 +39,19 @@ class TodoViewModel extends ChangeNotifier {
 
   Future<void> updateTodo(int id, String title, String secretNotes) async {
     final encryptedNotes = _encryptionService.encryptText(secretNotes);
+    var originalCreatedAt = DateTime.now();
+    for (final existingTodo in _todos) {
+      if (existingTodo.id == id) {
+        originalCreatedAt = existingTodo.createdAt;
+        break;
+      }
+    }
+
     final todo = TodoModel(
       id: id,
       title: title,
       encryptedSecretNotes: encryptedNotes,
-      createdAt:
-          DateTime.now(), // Keeping original might be better but for lab this is fine
+      createdAt: originalCreatedAt,
     );
     await _databaseService.updateTodo(todo);
     await _loadTodos();

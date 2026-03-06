@@ -19,11 +19,11 @@ class DatabaseService {
   Future<Database> _initDB() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, AppConstants.dbName);
-    
+
     debugPrint('--- DATABASE ENCRYPTION PROOF ---');
     debugPrint('DATABASE PATH: $path');
     debugPrint('STATUS: Initializing SQLCipher with hardware-backed key.');
-    
+
     return await openDatabase(
       path,
       password: _dbKey,
@@ -49,7 +49,10 @@ class DatabaseService {
 
   Future<List<TodoModel>> getTodos() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('todos', orderBy: 'createdAt DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'todos',
+      orderBy: 'createdAt DESC',
+    );
     return List.generate(maps.length, (i) => TodoModel.fromMap(maps[i]));
   }
 
@@ -65,10 +68,11 @@ class DatabaseService {
 
   Future<int> deleteTodo(int id) async {
     final db = await database;
-    return await db.delete(
-      'todos',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('todos', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteAllTodos() async {
+    final db = await database;
+    return await db.delete('todos');
   }
 }

@@ -115,6 +115,22 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAccount() async {
+    await Future.wait([
+      _keyStorage.deleteValue('user_email'),
+      _keyStorage.deleteValue('remembered_email'),
+      _keyStorage.deleteValue('last_logged_in_user'),
+      _keyStorage.deleteValue('has_logged_in_once'),
+      _keyStorage.deleteValue(AppConstants.biometricEnabledKey),
+    ]);
+
+    _simulatedOtp = null;
+    _isBiometricLoginEnabled = false;
+    _isLoggedIn = false;
+    _sessionService.stopTimer();
+    notifyListeners();
+  }
+
   void handleUserInteraction() {
     if (_isLoggedIn) {
       _sessionService.resetTimer();

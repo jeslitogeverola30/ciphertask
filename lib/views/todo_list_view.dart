@@ -75,6 +75,140 @@ class _TodoListViewState extends State<TodoListView>
     );
   }
 
+  Future<void> _handleLogout(AuthViewModel authViewModel) async {
+    final shouldLogout =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: zinc900,
+            title: const Text('Logout', style: TextStyle(color: zinc100)),
+            content: const Text(
+              'Are you sure you want to logout?',
+              style: TextStyle(color: zinc400),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel', style: TextStyle(color: zinc400)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Logout', style: TextStyle(color: zinc100)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldLogout) return;
+
+    authViewModel.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/login');
+  }
+
+  Future<void> _handleDeleteAccount(
+    AuthViewModel authViewModel,
+    TodoViewModel todoViewModel,
+  ) async {
+    final shouldDelete =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: zinc900,
+            title: const Text(
+              'Delete Account',
+              style: TextStyle(color: zinc100),
+            ),
+            content: const Text(
+              'This will remove your account data and all tasks. Continue?',
+              style: TextStyle(color: zinc400),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel', style: TextStyle(color: zinc400)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldDelete) return;
+
+    await todoViewModel.deleteAllTodos();
+    await authViewModel.deleteAccount();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/login');
+  }
+
+  void _showAccountActionsSheet(
+    AuthViewModel authViewModel,
+    TodoViewModel todoViewModel,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          decoration: _outlinedPanel(radius: 16, color: zinc950),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: zinc700,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Account',
+                style: TextStyle(
+                  color: zinc100,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.logout_rounded, color: zinc100),
+                title: const Text('Logout', style: TextStyle(color: zinc100)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _handleLogout(authViewModel);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text(
+                  'Delete account',
+                  style: TextStyle(color: Colors.red),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _handleDeleteAccount(authViewModel, todoViewModel);
+                },
+              ),
+              const SizedBox(height: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   BoxDecoration _outlinedPanel({double radius = 10, Color? color}) {
     return BoxDecoration(
       color: color ?? zinc900,
@@ -237,49 +371,10 @@ class _TodoListViewState extends State<TodoListView>
             margin: const EdgeInsets.only(right: 8),
             decoration: _outlinedPanel(),
             child: IconButton(
-              icon: const Icon(Icons.logout_rounded, color: zinc100),
-              tooltip: 'Logout',
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    backgroundColor: zinc900,
-                    title: const Text(
-                      'Logout',
-                      style: TextStyle(color: zinc100),
-                    ),
-                    content: const Text(
-                      'Are you sure you want to logout?',
-                      style: TextStyle(color: zinc400),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(color: zinc400),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          Navigator.pop(context);
-                          authViewModel.logout();
-
-                          if (context.mounted) {
-                            Navigator.of(
-                              context,
-                            ).pushReplacementNamed('/login');
-                          }
-                        },
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(color: zinc100),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              icon: const Icon(Icons.menu_rounded, color: zinc100),
+              tooltip: 'Account options',
+              onPressed: () =>
+                  _showAccountActionsSheet(authViewModel, todoViewModel),
             ),
           ),
         ],
